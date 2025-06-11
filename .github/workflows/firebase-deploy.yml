@@ -29,4 +29,4 @@ jobs:
       with:
         repoToken: ${{ secrets.GITHUB_TOKEN }}
         firebaseServiceAccount: ${{ secrets.FIREBASE_TOKEN }}
-        projectId: your-firebase-project-id
+        projectId: hiinventorypro
