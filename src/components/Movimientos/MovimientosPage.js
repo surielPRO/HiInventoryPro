@@ -1,27 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getDoc, collection, getDocs, updateDoc, addDoc, doc, increment, serverTimestamp } from 'firebase/firestore';
+import {
+  getDoc, collection, getDocs, updateDoc, addDoc, doc, increment, serverTimestamp
+} from 'firebase/firestore';
 import { db } from '../../firebase';
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  TextField, 
-  Select, 
-  MenuItem, 
-  InputLabel, 
-  FormControl,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Avatar,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions
+import {
+  Box, Typography, Button, TextField, Autocomplete,
+  Select, MenuItem, InputLabel, FormControl,
+  Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Paper, Avatar, Dialog,
+  DialogTitle, DialogContent, DialogActions,
+  CircularProgress, Backdrop
 } from '@mui/material';
 import { Inventory } from '@mui/icons-material';
 
@@ -37,30 +25,46 @@ const MovimientosPage = () => {
   });
   const [selectedProducto, setSelectedProducto] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const cargarDatos = async () => {
+    const productosSnapshot = await getDocs(collection(db, 'productos'));
+    const movimientosSnapshot = await getDocs(collection(db, 'movimientos'));
+    
+    setProductos(productosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setMovimientos(
+      movimientosSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => b.fecha?.toMillis() - a.fecha?.toMillis())
+    );
+  };
 
   useEffect(() => {
-    const cargarDatos = async () => {
-      const productosSnapshot = await getDocs(collection(db, 'productos'));
-      const movimientosSnapshot = await getDocs(collection(db, 'movimientos'));
-      
-      setProductos(productosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setMovimientos(movimientosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    };
     cargarDatos();
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!form.numeroEmpleado || !/^\d+$/.test(form.numeroEmpleado)) {
       alert("Ingrese un número de empleado válido");
       return;
     }
 
+    if (!form.cantidad || Number(form.cantidad) <= 0) {
+      alert("La cantidad debe ser un número mayor a cero.");
+      return;
+    }
+
+    if (!form.motivo.trim()) {
+      alert("Debe ingresar un motivo.");
+      return;
+    }
+
+    const productoRef = doc(db, "productos", form.productoId);
+    const productoSnap = await getDoc(productoRef);
+
     if (form.tipo === "salida") {
-      const productoRef = doc(db, "productos", form.productoId);
-      const productoSnap = await getDoc(productoRef);
-      
       if (productoSnap.exists()) {
         const stockActual = productoSnap.data().stock || 0;
         if (stockActual < Number(form.cantidad)) {
@@ -71,27 +75,32 @@ const MovimientosPage = () => {
     }
 
     try {
+      setLoading(true);
       await addDoc(collection(db, "movimientos"), {
         ...form,
         fecha: serverTimestamp(),
       });
 
-      const productoRef = doc(db, "productos", form.productoId);
       await updateDoc(productoRef, {
         stock: increment(form.tipo === "entrada" ? +form.cantidad : -form.cantidad),
       });
 
-      setForm({ 
-        productoId: "", 
-        tipo: "entrada", 
-        cantidad: "", 
-        motivo: "",
-        numeroEmpleado: ""
+      setForm({
+        productoId: '',
+        tipo: 'entrada',
+        cantidad: '',
+        motivo: '',
+        numeroEmpleado: ''
       });
+      setSelectedProducto(null);
+
+      await cargarDatos(); // Actualiza la lista sin recargar la página
       alert("Movimiento registrado y stock actualizado!");
     } catch (error) {
       console.error("Error:", error);
       alert("Error al registrar movimiento");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -103,25 +112,52 @@ const MovimientosPage = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Registro de Movimientos</Typography>
-      
+      <Typography color='white' variant="h4" gutterBottom>Registro de Movimientos</Typography>
+
+      {/* Spinner */}
+      <Backdrop open={loading} sx={{ zIndex: 1300, color: '#fff' }}>
+        <CircularProgress color="inherit" />
+        <Typography variant="h6" sx={{ ml: 2 }}>Guardando movimiento...</Typography>
+      </Backdrop>
+
       {/* Formulario */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <form onSubmit={handleSubmit}>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Producto</InputLabel>
-            <Select
-              value={form.productoId}
-              onChange={(e) => setForm({ ...form, productoId: e.target.value })}
-              required
-            >
-              {productos.map((producto) => (
-                <MenuItem key={producto.id} value={producto.id}>
-                  {producto.nombre} (Stock: {producto.stock || 0})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            options={productos}
+            getOptionLabel={(option) =>
+              `${option.nombre} — Bin: ${option.codigo || 'N/A'}`
+            }
+            onChange={(e, value) => {
+              setForm({ ...form, productoId: value?.id || '' });
+              setSelectedProducto(value || null);
+            }}
+            renderInput={(params) => (
+              <TextField {...params} label="Buscar producto" required fullWidth sx={{ mb: 2 }} />
+            )}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+          />
+
+          {selectedProducto && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 1, border: '1px solid #ccc', borderRadius: 1 }}>
+              <Avatar
+                src={selectedProducto.imagen}
+                alt={selectedProducto.nombre}
+                sx={{ width: 56, height: 56, mr: 2 }}
+              />
+              <Box>
+                <Typography variant="body1" fontWeight="bold">
+                  {selectedProducto.nombre}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Bin: {selectedProducto.codigo || 'N/A'} — Stock: {selectedProducto.stock || 0}
+                </Typography>
+                <Typography variant="body2">
+                  {selectedProducto.descripcion || 'Sin descripción'}
+                </Typography>
+              </Box>
+            </Box>
+          )}
 
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Tipo</InputLabel>
@@ -163,7 +199,7 @@ const MovimientosPage = () => {
             inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
           />
 
-          <Button type="submit" variant="contained" color="primary">
+          <Button type="submit" variant="contained" color="primary" disabled={loading}>
             Guardar Movimiento
           </Button>
         </form>
@@ -191,8 +227,8 @@ const MovimientosPage = () => {
                 <TableRow key={mov.id}>
                   <TableCell>{producto?.nombre || 'N/A'}</TableCell>
                   <TableCell>
-                    <Avatar 
-                      src={producto?.imagen} 
+                    <Avatar
+                      src={producto?.imagen}
                       sx={{ width: 40, height: 40, cursor: 'pointer' }}
                       onClick={() => handleVerImagen(mov.productoId)}
                     >
@@ -200,13 +236,7 @@ const MovimientosPage = () => {
                     </Avatar>
                   </TableCell>
                   <TableCell>
-                    <Box 
-                      component="span" 
-                      sx={{ 
-                        color: mov.tipo === 'entrada' ? 'green' : 'red',
-                        fontWeight: 'bold'
-                      }}
-                    >
+                    <Box component="span" sx={{ color: mov.tipo === 'entrada' ? 'green' : 'red', fontWeight: 'bold' }}>
                       {mov.tipo.toUpperCase()}
                     </Box>
                   </TableCell>
@@ -227,8 +257,8 @@ const MovimientosPage = () => {
         <DialogContent>
           {selectedProducto && (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 2 }}>
-              <Avatar 
-                src={selectedProducto.imagen} 
+              <Avatar
+                src={selectedProducto.imagen}
                 sx={{ width: 200, height: 200, mb: 2 }}
               >
                 {!selectedProducto.imagen && <Inventory sx={{ fontSize: 60 }} />}
