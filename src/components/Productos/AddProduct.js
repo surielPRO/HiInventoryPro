@@ -181,6 +181,7 @@ export default function AddProduct({ onCancel }) {
               <MenuItem value="">Seleccione</MenuItem>
               <MenuItem value="almacen">Almacén</MenuItem>
               <MenuItem value="quimicos">Químicos</MenuItem>
+              <MenuItem value="mro">MRO</MenuItem>
             </TextField>
           </Grid>
           <Grid item xs={12}>

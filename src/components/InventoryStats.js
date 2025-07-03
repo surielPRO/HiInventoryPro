@@ -79,26 +79,26 @@ const InventoryStats = () => {
 
   const statItems = [
     { 
-      title: 'Productos Totales', 
+      title: 'Total Products', 
       value: stats.totalProducts.toLocaleString(), 
       icon: <Inventory />, 
       color: 'success.main' 
     },
     { 
-      title: 'Stock Mínimo', 
+      title: 'Stock Minimum', 
       value: stats.lowStock, 
       icon: <Warning />, 
       color: 'warning.main',
-      subtitle: 'Productos bajo stock mínimo'
+      subtitle: 'Products under minimum stock'
     },
     { 
-      title: 'Entradas (Mes)', 
+      title: 'Input (Month)', 
       value: stats.monthlyEntries.toLocaleString(), 
       icon: <TrendingUp />, 
       color: 'info.main' 
     },
     { 
-      title: 'Salidas (Mes)', 
+      title: 'Output (Month)', 
       value: stats.monthlyExits.toLocaleString(), 
       icon: <TrendingDown />, 
       color: 'error.main' 

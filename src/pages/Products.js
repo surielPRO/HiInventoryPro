@@ -10,7 +10,6 @@ export default function Products() {
   const location = useLocation();
   const [showForm, setShowForm] = useState(false);
 
-  // Mostrar el formulario si el botón de "Nuevo Producto" fue el origen
   useEffect(() => {
     if (location.state?.showAddForm) {
       setShowForm(true);
@@ -19,17 +18,15 @@ export default function Products() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 3, color: 'white' }}>
-        Gestión de Productos Hisense
-      </Typography>
+      
       
       <Button
         variant="contained"
         startIcon={showForm ? <List /> : <Add />}
         onClick={() => setShowForm(!showForm)}
-        sx={{ mb: 3 }}
+        sx={{ mb: 1 }}
       >
-        {showForm ? 'Ver Lista' : 'Agregar Producto'}
+        {showForm ? 'Show List' : 'Add Product'}
       </Button>
 
       {showForm ? (
